@@ -17,6 +17,7 @@
 - **🐳 Docker Support**: Easy deployment with Docker Compose
 - **⚡ Hot Reload**: Development mode with automatic rebuilds using Air
 - **🏥 Health Monitoring**: Built-in health check endpoints
+- **📊 Database Visualization**: Drizzle Studio for local database exploration and management during development
 
 ### 115Cloud Integration
 
@@ -74,6 +75,7 @@ cloud-driver/
 - **Configuration**: [Viper](https://github.com/spf13/viper) for flexible config management
 - **115Cloud Client**: [115driver](https://github.com/SheltonZhu/115driver) for 115cloud API integration
 - **Development**: [Air](https://github.com/air-verse/air) for hot reloading
+- **Database Visualization**: [Drizzle Kit](https://orm.drizzle.team/drizzle-studio/overview) for database schema exploration and management
 
 ## Quick Start
 
@@ -81,6 +83,7 @@ cloud-driver/
 
 - **Go 1.24.4+**
 - **PostgreSQL 16+** (or use Docker Compose)
+- **Node.js 18+** (optional, for database visualization with Drizzle Studio)
 - **Docker & Docker Compose** (optional, for easy setup)
 
 ### Option 1: Docker Compose (Recommended)
@@ -381,6 +384,30 @@ sqlc generate
 psql -d cloud_driver -f database/migrate.sql
 ```
 
+### Database Visualization (Development)
+
+This project includes Drizzle Kit for local database visualization during development:
+
+```bash
+# Install Node.js dependencies (if not already installed)
+pnpm install
+
+# Set your database URL environment variable
+export DB_URL="postgresql://postgres:your_password@localhost:5432/cloud_driver"
+
+# Start Drizzle Studio for database visualization
+pnpm studio
+```
+
+Drizzle Studio will open in your browser (typically at `https://local.drizzle.studio`) and provide:
+
+- **Visual Schema Explorer**: Browse your database schema and relationships
+- **Data Browser**: View and edit table data with a user-friendly interface
+- **Query Interface**: Run custom SQL queries against your database
+- **Real-time Updates**: See changes as your application modifies the database
+
+> **Note**: Drizzle Studio is intended for development use only. Make sure your database URL points to your local development database, not production.
+
 ### Common Go Commands
 
 ```bash
@@ -517,6 +544,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [SQLC](https://sqlc.dev/) - Type-safe SQL query generator
 - [Viper](https://github.com/spf13/viper) - Configuration management
 - [Air](https://github.com/air-verse/air) - Live reloading for Go apps
+- [Drizzle Studio](https://orm.drizzle.team/drizzle-studio/overview) - Database visualization and management tool
 
 ## Support
 
