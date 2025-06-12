@@ -62,6 +62,8 @@ func (s *Drive115Service) AddOfflineTaskURIs(ctx context.Context, credentials mo
 		return nil, err
 	}
 
+	client.SetUserAgent(driver.UA115Browser)
+
 	// Default to root directory if not specified
 	if saveDirID == "" {
 		saveDirID = "0"

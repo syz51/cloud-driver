@@ -4,7 +4,7 @@ package models
 type Drive115Credentials struct {
 	UID  string `json:"uid" validate:"required,drive115_id,min=1,max=100"`
 	CID  string `json:"cid" validate:"required,drive115_id,min=1,max=100"`
-	SEID string `json:"seid" validate:"required,drive115_id,min=1,max=100"`
+	SEID string `json:"seid" validate:"required,drive115_id,min=1,max=200"`
 	KID  string `json:"kid" validate:"required,drive115_id,min=1,max=100"`
 }
 
