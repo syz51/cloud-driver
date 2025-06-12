@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"cloud-driver/internal/middleware"
 	"cloud-driver/internal/models"
 	"cloud-driver/internal/services"
 
@@ -24,12 +25,12 @@ func NewDrive115Handler(service *services.Drive115Service) *Drive115Handler {
 
 // GetUser returns the current user information
 func (h *Drive115Handler) GetUser(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
+	var req models.GetUserRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
 	}
 
-	userInfo, err := h.service.GetUser(c.Request().Context(), user.ID)
+	userInfo, err := h.service.GetUser(c.Request().Context(), req.Credentials)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to get user info: "+err.Error())
 	}
@@ -39,21 +40,25 @@ func (h *Drive115Handler) GetUser(c echo.Context) error {
 
 // ListOfflineTasks returns the list of offline download tasks
 func (h *Drive115Handler) ListOfflineTasks(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
+	var req models.TaskListRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
 	}
 
-	pageStr := c.QueryParam("page")
-	page := int64(1)
-
-	if pageStr != "" {
-		if p, err := strconv.ParseInt(pageStr, 10, 64); err == nil {
-			page = p
+	// Handle page parameter from query string if not in body
+	if req.Page == 0 {
+		pageStr := c.QueryParam("page")
+		if pageStr != "" {
+			if p, err := strconv.ParseInt(pageStr, 10, 64); err == nil {
+				req.Page = p
+			}
+		}
+		if req.Page == 0 {
+			req.Page = 1
 		}
 	}
 
-	tasks, err := h.service.ListOfflineTasks(c.Request().Context(), user.ID, page)
+	tasks, err := h.service.ListOfflineTasks(c.Request().Context(), req.Credentials, req.Page)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to list offline tasks: "+err.Error())
 	}
@@ -63,21 +68,12 @@ func (h *Drive115Handler) ListOfflineTasks(c echo.Context) error {
 
 // AddOfflineTask adds new offline download tasks
 func (h *Drive115Handler) AddOfflineTask(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
-	}
-
 	var req models.OfflineDownloadRequest
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body: "+err.Error())
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
 	}
 
-	if len(req.URLs) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "URLs are required")
-	}
-
-	hashes, err := h.service.AddOfflineTaskURIs(c.Request().Context(), user.ID, req.URLs, req.SaveDirID)
+	hashes, err := h.service.AddOfflineTaskURIs(c.Request().Context(), req.Credentials, req.URLs, req.SaveDirID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to add offline task: "+err.Error())
 	}
@@ -91,21 +87,12 @@ func (h *Drive115Handler) AddOfflineTask(c echo.Context) error {
 
 // DeleteOfflineTasks deletes offline tasks
 func (h *Drive115Handler) DeleteOfflineTasks(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
-	}
-
 	var req models.DeleteTasksRequest
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body: "+err.Error())
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
 	}
 
-	if len(req.Hashes) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "Task hashes are required")
-	}
-
-	err := h.service.DeleteOfflineTasks(c.Request().Context(), user.ID, req.Hashes, req.DeleteFiles)
+	err := h.service.DeleteOfflineTasks(c.Request().Context(), req.Credentials, req.Hashes, req.DeleteFiles)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to delete offline tasks: "+err.Error())
 	}
@@ -119,17 +106,12 @@ func (h *Drive115Handler) DeleteOfflineTasks(c echo.Context) error {
 
 // ClearOfflineTasks clears offline tasks
 func (h *Drive115Handler) ClearOfflineTasks(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
-	}
-
 	var req models.ClearTasksRequest
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body: "+err.Error())
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
 	}
 
-	err := h.service.ClearOfflineTasks(c.Request().Context(), user.ID, req.ClearFlag)
+	err := h.service.ClearOfflineTasks(c.Request().Context(), req.Credentials, req.ClearFlag)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to clear offline tasks: "+err.Error())
 	}
@@ -141,21 +123,22 @@ func (h *Drive115Handler) ClearOfflineTasks(c echo.Context) error {
 
 // ListFiles lists files and directories
 func (h *Drive115Handler) ListFiles(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
+	var req models.ListFilesRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
 	}
 
-	dirIDStr := c.QueryParam("dir_id")
-	dirID := int64(0) // Root directory
-
-	if dirIDStr != "" {
-		if id, err := strconv.ParseInt(dirIDStr, 10, 64); err == nil {
-			dirID = id
+	// Handle dir_id parameter from query string if not in body
+	if req.DirID == 0 {
+		dirIDStr := c.QueryParam("dir_id")
+		if dirIDStr != "" {
+			if id, err := strconv.ParseInt(dirIDStr, 10, 64); err == nil {
+				req.DirID = id
+			}
 		}
 	}
 
-	files, err := h.service.ListFiles(c.Request().Context(), user.ID, dirID)
+	files, err := h.service.ListFiles(c.Request().Context(), req.Credentials, req.DirID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to list files: "+err.Error())
 	}
@@ -165,18 +148,22 @@ func (h *Drive115Handler) ListFiles(c echo.Context) error {
 
 // GetFileInfo returns information about a specific file
 func (h *Drive115Handler) GetFileInfo(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
-	}
+	var req models.FileInfoRequest
 
+	// Get file ID from URL path parameter
 	fileIDStr := c.Param("id")
 	fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file ID")
 	}
+	req.FileID = fileID
 
-	fileInfo, err := h.service.GetFileInfo(c.Request().Context(), user.ID, fileID)
+	// Get credentials from request body and validate
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	fileInfo, err := h.service.GetFileInfo(c.Request().Context(), req.Credentials, req.FileID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to get file info: "+err.Error())
 	}
@@ -186,18 +173,22 @@ func (h *Drive115Handler) GetFileInfo(c echo.Context) error {
 
 // DownloadFile returns download information for a file
 func (h *Drive115Handler) DownloadFile(c echo.Context) error {
-	user := getUserFromContext(c)
-	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User not authenticated")
-	}
+	var req models.DownloadRequest
 
+	// Get file ID from URL path parameter
 	fileIDStr := c.Param("id")
 	fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file ID")
 	}
+	req.FileID = fileID
 
-	downloadInfo, err := h.service.GetDownloadInfo(c.Request().Context(), user.ID, fileID)
+	// Get credentials from request body and validate
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	downloadInfo, err := h.service.GetDownloadInfo(c.Request().Context(), req.Credentials, req.FileID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to get download info: "+err.Error())
 	}

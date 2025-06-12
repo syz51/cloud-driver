@@ -5,77 +5,59 @@ import (
 	"fmt"
 	"strconv"
 
+	"cloud-driver/internal/models"
+
 	"github.com/SheltonZhu/115driver/pkg/driver"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Drive115Service provides 115drive cloud storage operations with user-specific credentials
-type Drive115Service struct {
-	credentialsService *CredentialsService
-	pool               *pgxpool.Pool
-}
+// Drive115Service provides 115drive cloud storage operations with credentials from requests
+type Drive115Service struct{}
 
 // NewDrive115Service creates a new instance of Drive115Service
-func NewDrive115Service(pool *pgxpool.Pool) *Drive115Service {
-	return &Drive115Service{
-		credentialsService: NewCredentialsService(pool),
-		pool:               pool,
-	}
+func NewDrive115Service() *Drive115Service {
+	return &Drive115Service{}
 }
 
-// getClientForUser returns a 115driver client for a specific user using their active credentials
-func (s *Drive115Service) getClientForUser(ctx context.Context, userID int32) (*driver.Pan115Client, error) {
-	// Get active credentials for the user
-	credentials, err := s.credentialsService.GetActiveUserCredentials(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user credentials: %w", err)
-	}
-
-	if len(credentials) == 0 {
-		return nil, fmt.Errorf("no active credentials found for user")
-	}
-
-	// Use the first active credential (there should only be one active at a time)
-	cred := credentials[0]
-
+// createClient creates a 115driver client with the provided credentials
+func (s *Drive115Service) createClient(credentials models.Drive115Credentials) (*driver.Pan115Client, error) {
 	// Create driver credential
 	cr := &driver.Credential{
-		UID:  cred.UID,
-		CID:  cred.CID,
-		SEID: cred.SEID,
-		KID:  cred.KID,
+		UID:  credentials.UID,
+		CID:  credentials.CID,
+		SEID: credentials.SEID,
+		KID:  credentials.KID,
 	}
 
 	// Create client and verify login
 	client := driver.Defalut().ImportCredential(cr)
 	if err := client.LoginCheck(); err != nil {
-		return nil, fmt.Errorf("115 driver login failed for user %d: %w", userID, err)
+		return nil, fmt.Errorf("115 driver login failed: %w", err)
 	}
 
 	return client, nil
 }
 
-// GetUser returns the current user information for a specific user
-func (s *Drive115Service) GetUser(ctx context.Context, userID int32) (interface{}, error) {
-	client, err := s.getClientForUser(ctx, userID)
+// GetUser returns the current user information
+func (s *Drive115Service) GetUser(ctx context.Context, credentials models.Drive115Credentials) (interface{}, error) {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}
 	return client.GetUser()
 }
 
-// ListOfflineTasks returns the list of offline download tasks for a specific user
-func (s *Drive115Service) ListOfflineTasks(ctx context.Context, userID int32, page int64) (interface{}, error) {
-	client, err := s.getClientForUser(ctx, userID)
+// ListOfflineTasks returns the list of offline download tasks
+func (s *Drive115Service) ListOfflineTasks(ctx context.Context, credentials models.Drive115Credentials, page int64) (interface{}, error) {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}
 	return client.ListOfflineTask(page)
 }
 
-// AddOfflineTaskURIs adds new offline download tasks for a specific user
-func (s *Drive115Service) AddOfflineTaskURIs(ctx context.Context, userID int32, urls []string, saveDirID string) ([]string, error) {
-	client, err := s.getClientForUser(ctx, userID)
+// AddOfflineTaskURIs adds new offline download tasks
+func (s *Drive115Service) AddOfflineTaskURIs(ctx context.Context, credentials models.Drive115Credentials, urls []string, saveDirID string) ([]string, error) {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}
@@ -87,27 +69,27 @@ func (s *Drive115Service) AddOfflineTaskURIs(ctx context.Context, userID int32, 
 	return client.AddOfflineTaskURIs(urls, saveDirID)
 }
 
-// DeleteOfflineTasks deletes offline tasks by their hashes for a specific user
-func (s *Drive115Service) DeleteOfflineTasks(ctx context.Context, userID int32, hashes []string, deleteFiles bool) error {
-	client, err := s.getClientForUser(ctx, userID)
+// DeleteOfflineTasks deletes offline tasks by their hashes
+func (s *Drive115Service) DeleteOfflineTasks(ctx context.Context, credentials models.Drive115Credentials, hashes []string, deleteFiles bool) error {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return err
 	}
 	return client.DeleteOfflineTasks(hashes, deleteFiles)
 }
 
-// ClearOfflineTasks clears offline tasks with the specified flag for a specific user
-func (s *Drive115Service) ClearOfflineTasks(ctx context.Context, userID int32, clearFlag int64) error {
-	client, err := s.getClientForUser(ctx, userID)
+// ClearOfflineTasks clears offline tasks with the specified flag
+func (s *Drive115Service) ClearOfflineTasks(ctx context.Context, credentials models.Drive115Credentials, clearFlag int64) error {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return err
 	}
 	return client.ClearOfflineTasks(clearFlag)
 }
 
-// ListFiles lists files and directories in the specified directory for a specific user
-func (s *Drive115Service) ListFiles(ctx context.Context, userID int32, dirID int64) (*[]driver.File, error) {
-	client, err := s.getClientForUser(ctx, userID)
+// ListFiles lists files and directories in the specified directory
+func (s *Drive115Service) ListFiles(ctx context.Context, credentials models.Drive115Credentials, dirID int64) (*[]driver.File, error) {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}
@@ -117,9 +99,9 @@ func (s *Drive115Service) ListFiles(ctx context.Context, userID int32, dirID int
 	return client.List(dirIDStr)
 }
 
-// GetFileInfo returns information about a specific file for a specific user
-func (s *Drive115Service) GetFileInfo(ctx context.Context, userID int32, fileID int64) (interface{}, error) {
-	client, err := s.getClientForUser(ctx, userID)
+// GetFileInfo returns information about a specific file
+func (s *Drive115Service) GetFileInfo(ctx context.Context, credentials models.Drive115Credentials, fileID int64) (interface{}, error) {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}
@@ -130,9 +112,9 @@ func (s *Drive115Service) GetFileInfo(ctx context.Context, userID int32, fileID 
 	return client.GetInfo()
 }
 
-// GetDownloadInfo returns download information for a file for a specific user
-func (s *Drive115Service) GetDownloadInfo(ctx context.Context, userID int32, fileID int64) (interface{}, error) {
-	client, err := s.getClientForUser(ctx, userID)
+// GetDownloadInfo returns download information for a file
+func (s *Drive115Service) GetDownloadInfo(ctx context.Context, credentials models.Drive115Credentials, fileID int64) (interface{}, error) {
+	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}

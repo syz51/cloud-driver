@@ -5,31 +5,24 @@ import (
 	"fmt"
 
 	"cloud-driver/internal/config"
-	"cloud-driver/internal/database"
 	"cloud-driver/internal/handlers"
+	"cloud-driver/internal/middleware"
 	"cloud-driver/internal/services"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
 // Server represents the HTTP server
 type Server struct {
 	config *config.Config
 	echo   *echo.Echo
-	db     *database.Database
 }
 
 // New creates a new server instance
 func New(cfg *config.Config) (*Server, error) {
-	// Initialize database connection
-	db, err := database.New(&cfg.Database)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
-	}
-
-	// Initialize 115drive service with database pool
-	drive115Service := services.NewDrive115Service(db.GetPool())
+	// Initialize 115drive service (no database needed)
+	drive115Service := services.NewDrive115Service()
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler()
@@ -40,9 +33,11 @@ func New(cfg *config.Config) (*Server, error) {
 	e.HideBanner = true
 
 	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+	e.Use(echomiddleware.Logger())
+	e.Use(echomiddleware.Recover())
+	e.Use(echomiddleware.CORS())
+
+	e.Use(middleware.ValidationMiddleware())
 
 	// Setup routes
 	setupRoutes(e, healthHandler, drive115Handler)
@@ -50,7 +45,6 @@ func New(cfg *config.Config) (*Server, error) {
 	return &Server{
 		config: cfg,
 		echo:   e,
-		db:     db,
 	}, nil
 }
 
@@ -65,13 +59,13 @@ func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Ha
 	// 115drive routes
 	drive115 := api.Group("/115")
 	{
-		drive115.GET("/user", drive115Handler.GetUser)
-		drive115.GET("/tasks", drive115Handler.ListOfflineTasks)
+		drive115.POST("/user", drive115Handler.GetUser)
+		drive115.POST("/tasks", drive115Handler.ListOfflineTasks)
 		drive115.POST("/tasks/add", drive115Handler.AddOfflineTask)
-		drive115.DELETE("/tasks", drive115Handler.DeleteOfflineTasks)
-		drive115.DELETE("/tasks/clear", drive115Handler.ClearOfflineTasks)
-		drive115.GET("/files", drive115Handler.ListFiles)
-		drive115.GET("/files/:id", drive115Handler.GetFileInfo)
+		drive115.POST("/tasks/delete", drive115Handler.DeleteOfflineTasks)
+		drive115.POST("/tasks/clear", drive115Handler.ClearOfflineTasks)
+		drive115.POST("/files", drive115Handler.ListFiles)
+		drive115.POST("/files/:id", drive115Handler.GetFileInfo)
 		drive115.POST("/files/:id/download", drive115Handler.DownloadFile)
 	}
 }
@@ -84,9 +78,5 @@ func (s *Server) Start() error {
 
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
-	// Close database connection
-	if s.db != nil {
-		s.db.Close()
-	}
 	return s.echo.Shutdown(ctx)
 }

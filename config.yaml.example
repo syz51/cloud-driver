@@ -1,24 +1,11 @@
+# Cloud Driver Server Configuration
+# Copy this file to config.yml and modify as needed
+
 server:
-  host: "localhost"
-  port: 8080
+  host: "0.0.0.0"  # Server bind address (0.0.0.0 for all interfaces)
+  port: 8081       # Server port
 
-database:
-  host: "localhost"
-  port: 5432
-  user: "postgres"
-  password: "your_password_here"
-  name: "cloud_driver"
-  ssl_mode: "disable"
-
-# Note: Drive115 credentials are now stored in the database per user
-# Use the API endpoints to add credentials after registering a user account
 
 # You can also set these via environment variables:
-# CLOUD_DRIVER_SERVER_HOST=localhost
+# CLOUD_DRIVER_SERVER_HOST=0.0.0.0
 # CLOUD_DRIVER_SERVER_PORT=8080
-# CLOUD_DRIVER_DATABASE_HOST=localhost
-# CLOUD_DRIVER_DATABASE_PORT=5432
-# CLOUD_DRIVER_DATABASE_USER=postgres
-# CLOUD_DRIVER_DATABASE_PASSWORD=your_password
-# CLOUD_DRIVER_DATABASE_NAME=cloud_driver
-# CLOUD_DRIVER_DATABASE_SSL_MODE=disable 
