@@ -198,3 +198,74 @@ func (h *Drive115Handler) DownloadFile(c echo.Context) error {
 		"download_info": downloadInfo,
 	})
 }
+
+// QRCodeStart starts a new QR code login session
+func (h *Drive115Handler) QRCodeStart(c echo.Context) error {
+	var req models.QRCodeStartRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	response, err := h.service.QRCodeStart(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to start QR code session: "+err.Error())
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+// QRCodeImage generates and returns QR code image data
+func (h *Drive115Handler) QRCodeImage(c echo.Context) error {
+	var req models.QRCodeImageRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	imageData, err := h.service.QRCodeGetImage(c.Request().Context(), req.UID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to generate QR code image: "+err.Error())
+	}
+
+	// Set proper headers for PNG image
+	c.Response().Header().Set("Content-Type", "image/png")
+	c.Response().Header().Set("Content-Length", strconv.Itoa(len(imageData)))
+	c.Response().Header().Set("Cache-Control", "no-cache")
+
+	return c.Blob(http.StatusOK, "image/png", imageData)
+}
+
+// QRCodeStatus checks the current status of a QR code scan
+func (h *Drive115Handler) QRCodeStatus(c echo.Context) error {
+	var req models.QRCodeStatusRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	response, err := h.service.QRCodeCheckStatus(c.Request().Context(), req.UID, req.Sign, req.Time)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to check QR code status: "+err.Error())
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+// QRCodeLogin completes the QR code login process and returns credentials
+func (h *Drive115Handler) QRCodeLogin(c echo.Context) error {
+	var req models.QRCodeLoginRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	response, err := h.service.QRCodeLogin(c.Request().Context(), req.UID, req.Sign, req.Time, req.App)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to complete QR code login: "+err.Error())
+	}
+
+	// Return appropriate status code based on success
+	statusCode := http.StatusOK
+	if !response.Success {
+		statusCode = http.StatusBadRequest
+	}
+
+	return c.JSON(statusCode, response)
+}

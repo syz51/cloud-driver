@@ -56,3 +56,50 @@ type DownloadRequest struct {
 	Credentials Drive115Credentials `json:"credentials" validate:"required"`
 	FileID      int64               `json:"file_id" validate:"required,gt=0"`
 }
+
+// QRCodeStartRequest represents a request to start a QR code session
+type QRCodeStartRequest struct {
+	// No credentials required for starting a QR session
+}
+
+// QRCodeStartResponse represents the response from starting a QR session
+type QRCodeStartResponse struct {
+	UID           string `json:"uid"`
+	Sign          string `json:"sign"`
+	Time          int64  `json:"time"`
+	QrcodeContent string `json:"qrcode_content"`
+}
+
+// QRCodeImageRequest represents a request to get QR code image
+type QRCodeImageRequest struct {
+	UID string `json:"uid" validate:"required"`
+}
+
+// QRCodeStatusRequest represents a request to check QR code scan status
+type QRCodeStatusRequest struct {
+	UID  string `json:"uid" validate:"required"`
+	Sign string `json:"sign" validate:"required"`
+	Time int64  `json:"time" validate:"required"`
+}
+
+// QRCodeStatusResponse represents the response for QR code status check
+type QRCodeStatusResponse struct {
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+	Version string `json:"version"`
+}
+
+// QRCodeLoginRequest represents a request to complete QR code login
+type QRCodeLoginRequest struct {
+	UID  string `json:"uid" validate:"required"`
+	Sign string `json:"sign" validate:"required"`
+	Time int64  `json:"time" validate:"required"`
+	App  string `json:"app" validate:"omitempty,oneof=web android ios tv alipaymini wechatmini qandroid"`
+}
+
+// QRCodeLoginResponse represents the response from completing QR login
+type QRCodeLoginResponse struct {
+	Credentials Drive115Credentials `json:"credentials"`
+	Success     bool                `json:"success"`
+	Message     string              `json:"message"`
+}

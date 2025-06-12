@@ -67,6 +67,12 @@ func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Ha
 		drive115.POST("/files", drive115Handler.ListFiles)
 		drive115.POST("/files/:id", drive115Handler.GetFileInfo)
 		drive115.POST("/files/:id/download", drive115Handler.DownloadFile)
+
+		// QR Code login routes
+		drive115.POST("/qrcode/start", drive115Handler.QRCodeStart)
+		drive115.POST("/qrcode/image", drive115Handler.QRCodeImage)
+		drive115.POST("/qrcode/status", drive115Handler.QRCodeStatus)
+		drive115.POST("/qrcode/login", drive115Handler.QRCodeLogin)
 	}
 }
 
