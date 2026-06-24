@@ -43,6 +43,8 @@ type GetUserRequest struct {
 type ListFilesRequest struct {
 	Credentials Drive115Credentials `json:"credentials" validate:"required"`
 	DirID       int64               `json:"dir_id" validate:"omitempty,gte=0"`
+	Offset      int64               `json:"offset" validate:"omitempty,gte=0"`
+	Limit       int64               `json:"limit" validate:"omitempty,gte=1,lte=1150"`
 }
 
 // FileInfoRequest represents a request to get file info

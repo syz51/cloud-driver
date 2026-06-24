@@ -85,16 +85,20 @@ func (s *Drive115Service) ClearOfflineTasks(ctx context.Context, credentials mod
 	return client.ClearOfflineTasks(clearFlag)
 }
 
-// ListFiles lists files and directories in the specified directory
-func (s *Drive115Service) ListFiles(ctx context.Context, credentials models.Drive115Credentials, dirID int64) (*[]driver.File, error) {
+// ListFiles lists one page of files and directories in the specified directory
+func (s *Drive115Service) ListFiles(ctx context.Context, credentials models.Drive115Credentials, dirID, offset, limit int64) (*[]driver.File, error) {
 	client, err := s.createClient(credentials)
 	if err != nil {
 		return nil, err
 	}
 
+	if limit == 0 {
+		limit = driver.FileListLimit
+	}
+
 	// Convert int64 to string as required by the API
 	dirIDStr := strconv.FormatInt(dirID, 10)
-	return client.List(dirIDStr)
+	return client.ListPage(dirIDStr, offset, limit)
 }
 
 // GetFileInfo returns information about a specific file

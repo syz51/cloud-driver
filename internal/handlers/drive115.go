@@ -138,7 +138,25 @@ func (h *Drive115Handler) ListFiles(c echo.Context) error {
 		}
 	}
 
-	files, err := h.service.ListFiles(c.Request().Context(), req.Credentials, req.DirID)
+	if req.Offset == 0 {
+		offsetStr := c.QueryParam("offset")
+		if offsetStr != "" {
+			if offset, err := strconv.ParseInt(offsetStr, 10, 64); err == nil {
+				req.Offset = offset
+			}
+		}
+	}
+
+	if req.Limit == 0 {
+		limitStr := c.QueryParam("limit")
+		if limitStr != "" {
+			if limit, err := strconv.ParseInt(limitStr, 10, 64); err == nil {
+				req.Limit = limit
+			}
+		}
+	}
+
+	files, err := h.service.ListFiles(c.Request().Context(), req.Credentials, req.DirID, req.Offset, req.Limit)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to list files: "+err.Error())
 	}
