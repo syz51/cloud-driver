@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +36,8 @@ var videoExtensions = map[string]bool{
 }
 
 const folderVideoScanPageDelay = 750 * time.Millisecond
+
+var trailingCodeNamePattern = regexp.MustCompile(`[a-z]+-\d+$`)
 
 // NewDrive115Service creates a new instance of Drive115Service
 func NewDrive115Service() *Drive115Service {
@@ -216,6 +219,9 @@ func normalizeVideoMatchName(name string) string {
 			return base
 		}
 	}
+	if match := trailingCodeNamePattern.FindString(name); match != "" && match != name {
+		return match
+	}
 	return name
 }
 
@@ -252,7 +258,22 @@ func isMatchingVideoFile(file driver.FileInfo, expectedName string) bool {
 		return true
 	}
 
-	return strings.Contains(strings.ToLower(file.Name), expectedName)
+	fileName := strings.ToLower(file.Name)
+	for _, name := range videoMatchNames(expectedName) {
+		if strings.Contains(fileName, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func videoMatchNames(name string) []string {
+	names := []string{name}
+	parts := strings.Split(name, "-")
+	if len(parts) == 2 && looksLikeCodeName(name) && len(parts[1]) < 5 {
+		names = append(names, parts[0]+strings.Repeat("0", 5-len(parts[1]))+parts[1])
+	}
+	return names
 }
 
 func looksLikeCodeName(name string) bool {

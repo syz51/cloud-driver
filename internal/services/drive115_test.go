@@ -8,35 +8,46 @@ import (
 
 func TestIsMatchingVideoFile(t *testing.T) {
 	cases := []struct {
-		name     string
-		file     driver.FileInfo
-		expected bool
+		name         string
+		expectedName string
+		file         driver.FileInfo
+		expected     bool
 	}{
 		{
-			name:     "exact normalized video",
-			file:     driver.FileInfo{Name: "MUKD-569.mp4", Type: "mp4"},
-			expected: true,
+			name:         "exact normalized video",
+			expectedName: "mukd-569",
+			file:         driver.FileInfo{Name: "MUKD-569.mp4", Type: "mp4"},
+			expected:     true,
 		},
 		{
-			name:     "prefixed video",
-			file:     driver.FileInfo{Name: "xxxx@MUKD-569.mp4", Type: "mp4"},
-			expected: true,
+			name:         "prefixed video",
+			expectedName: "mukd-569",
+			file:         driver.FileInfo{Name: "xxxx@MUKD-569.mp4", Type: "mp4"},
+			expected:     true,
 		},
 		{
-			name:     "wrong video",
-			file:     driver.FileInfo{Name: "MUKD-570.mp4", Type: "mp4"},
-			expected: false,
+			name:         "zero padded compact code video",
+			expectedName: "savr-1048",
+			file:         driver.FileInfo{Name: "4k2.me@savr01048_2_8k.mp4", Type: "mp4"},
+			expected:     true,
 		},
 		{
-			name:     "matching non-video",
-			file:     driver.FileInfo{Name: "MUKD-569.txt", Type: "txt"},
-			expected: false,
+			name:         "wrong video",
+			expectedName: "mukd-569",
+			file:         driver.FileInfo{Name: "MUKD-570.mp4", Type: "mp4"},
+			expected:     false,
+		},
+		{
+			name:         "matching non-video",
+			expectedName: "mukd-569",
+			file:         driver.FileInfo{Name: "MUKD-569.txt", Type: "txt"},
+			expected:     false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := isMatchingVideoFile(tc.file, "mukd-569")
+			got := isMatchingVideoFile(tc.file, tc.expectedName)
 			if got != tc.expected {
 				t.Fatalf("expected %v, got %v", tc.expected, got)
 			}
@@ -51,6 +62,7 @@ func TestNormalizeVideoMatchName(t *testing.T) {
 		"FSDSS-894-uncensored-HD": "fsdss-894",
 		"358NTR-101":              "ntr-101",
 		"358NTR-101ch":            "ntr-101",
+		"第一會所新片@SIS001@STCV-595":  "stcv-595",
 		"mukd-569":                "mukd-569",
 		"moviech":                 "moviech",
 	}
@@ -60,6 +72,28 @@ func TestNormalizeVideoMatchName(t *testing.T) {
 			got := normalizeVideoMatchName(input)
 			if got != expected {
 				t.Fatalf("expected %q, got %q", expected, got)
+			}
+		})
+	}
+}
+
+func TestVideoMatchNames(t *testing.T) {
+	cases := map[string][]string{
+		"savr-1048":  {"savr-1048", "savr01048"},
+		"mukd-569":   {"mukd-569", "mukd00569"},
+		"hodv-22068": {"hodv-22068"},
+	}
+
+	for input, expected := range cases {
+		t.Run(input, func(t *testing.T) {
+			got := videoMatchNames(input)
+			if len(got) != len(expected) {
+				t.Fatalf("expected %v, got %v", expected, got)
+			}
+			for i := range expected {
+				if got[i] != expected[i] {
+					t.Fatalf("expected %v, got %v", expected, got)
+				}
 			}
 		})
 	}
