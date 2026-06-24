@@ -38,6 +38,8 @@ var videoExtensions = map[string]bool{
 const folderVideoScanPageDelay = 750 * time.Millisecond
 
 var trailingCodeNamePattern = regexp.MustCompile(`[a-z]+-\d+$`)
+var trailingCodeNameWithSuffixPattern = regexp.MustCompile(`(^|[^a-z0-9])([a-z]+-\d+)(ch|-c|-uncensored-hd|-中文字幕)$`)
+var trailingFC2PPVNamePattern = regexp.MustCompile(`(^|[^a-z0-9])fc2[- ]?ppv[- ]?([0-9]+)(-(c|uc))?$`)
 
 // NewDrive115Service creates a new instance of Drive115Service
 func NewDrive115Service() *Drive115Service {
@@ -209,7 +211,13 @@ func normalizeVideoMatchName(name string) string {
 	}
 	if strings.HasSuffix(name, "-c") {
 		base := strings.TrimSuffix(name, "-c")
-		if looksLikeCodeName(base) {
+		if looksLikeCodeName(base) || looksLikeFC2PPVName(base) {
+			return base
+		}
+	}
+	if strings.HasSuffix(name, "-uc") {
+		base := strings.TrimSuffix(name, "-uc")
+		if looksLikeFC2PPVName(base) {
 			return base
 		}
 	}
@@ -218,6 +226,18 @@ func normalizeVideoMatchName(name string) string {
 		if looksLikeCodeName(base) {
 			return base
 		}
+	}
+	if strings.HasSuffix(name, "-中文字幕") {
+		base := strings.TrimSuffix(name, "-中文字幕")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
+	if match := trailingFC2PPVNamePattern.FindStringSubmatch(name); match != nil {
+		return "fc2ppv-" + match[2]
+	}
+	if match := trailingCodeNameWithSuffixPattern.FindStringSubmatch(name); match != nil {
+		return match[2]
 	}
 	if match := trailingCodeNamePattern.FindString(name); match != "" && match != name {
 		return match
@@ -247,6 +267,9 @@ func trimLeadingDigitsBeforeCodeName(name string) string {
 	if strings.HasSuffix(rest, "-uncensored-hd") && looksLikeCodeName(strings.TrimSuffix(rest, "-uncensored-hd")) {
 		return rest
 	}
+	if strings.HasSuffix(rest, "-中文字幕") && looksLikeCodeName(strings.TrimSuffix(rest, "-中文字幕")) {
+		return rest
+	}
 	return name
 }
 
@@ -269,6 +292,9 @@ func isMatchingVideoFile(file driver.FileInfo, expectedName string) bool {
 
 func videoMatchNames(name string) []string {
 	names := []string{name}
+	if strings.HasPrefix(name, "fc2ppv-") {
+		names = append(names, strings.Replace(name, "fc2ppv-", "fc2-ppv-", 1))
+	}
 	parts := strings.Split(name, "-")
 	if len(parts) == 2 && looksLikeCodeName(name) && len(parts[1]) < 5 {
 		names = append(names, parts[0]+strings.Repeat("0", 5-len(parts[1]))+parts[1])
@@ -288,6 +314,19 @@ func looksLikeCodeName(name string) bool {
 		}
 	}
 	for _, r := range parts[1] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func looksLikeFC2PPVName(name string) bool {
+	const prefix = "fc2ppv-"
+	if !strings.HasPrefix(name, prefix) || len(name) == len(prefix) {
+		return false
+	}
+	for _, r := range strings.TrimPrefix(name, prefix) {
 		if r < '0' || r > '9' {
 			return false
 		}

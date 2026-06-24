@@ -32,6 +32,12 @@ func TestIsMatchingVideoFile(t *testing.T) {
 			expected:     true,
 		},
 		{
+			name:         "hyphenated fc2 ppv video",
+			expectedName: "fc2ppv-4895806",
+			file:         driver.FileInfo{Name: "hhd800.com@FC2-PPV-4895806.mp4", Type: "mp4"},
+			expected:     true,
+		},
+		{
 			name:         "wrong video",
 			expectedName: "mukd-569",
 			file:         driver.FileInfo{Name: "MUKD-570.mp4", Type: "mp4"},
@@ -57,14 +63,20 @@ func TestIsMatchingVideoFile(t *testing.T) {
 
 func TestNormalizeVideoMatchName(t *testing.T) {
 	cases := map[string]string{
-		"MUKD-569ch":              "mukd-569",
-		"ROYD-329-C":              "royd-329",
-		"FSDSS-894-uncensored-HD": "fsdss-894",
-		"358NTR-101":              "ntr-101",
-		"358NTR-101ch":            "ntr-101",
-		"第一會所新片@SIS001@STCV-595":  "stcv-595",
-		"mukd-569":                "mukd-569",
-		"moviech":                 "moviech",
+		"MUKD-569ch":                            "mukd-569",
+		"ROYD-329-C":                            "royd-329",
+		"FSDSS-894-uncensored-HD":               "fsdss-894",
+		"MNGS-045-中文字幕":                         "mngs-045",
+		"358NTR-101":                            "ntr-101",
+		"358NTR-101ch":                          "ntr-101",
+		"[7sht.me]IPX-118-C":                    "ipx-118",
+		"第一會所新片@SIS001@STCV-595":                "stcv-595",
+		"madoubt.com 669659.xyz fc2ppv-4912492": "fc2ppv-4912492",
+		"FC2-PPV-4895806":                       "fc2ppv-4895806",
+		"FC2PPV-3061625-C":                      "fc2ppv-3061625",
+		"FC2PPV-3175924-UC":                     "fc2ppv-3175924",
+		"mukd-569":                              "mukd-569",
+		"moviech":                               "moviech",
 	}
 
 	for input, expected := range cases {
@@ -79,9 +91,10 @@ func TestNormalizeVideoMatchName(t *testing.T) {
 
 func TestVideoMatchNames(t *testing.T) {
 	cases := map[string][]string{
-		"savr-1048":  {"savr-1048", "savr01048"},
-		"mukd-569":   {"mukd-569", "mukd00569"},
-		"hodv-22068": {"hodv-22068"},
+		"savr-1048":      {"savr-1048", "savr01048"},
+		"mukd-569":       {"mukd-569", "mukd00569"},
+		"hodv-22068":     {"hodv-22068"},
+		"fc2ppv-4895806": {"fc2ppv-4895806", "fc2-ppv-4895806"},
 	}
 
 	for input, expected := range cases {
