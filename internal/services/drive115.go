@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"cloud-driver/internal/models"
 
@@ -12,6 +14,27 @@ import (
 
 // Drive115Service provides 115drive cloud storage operations with credentials from requests
 type Drive115Service struct{}
+
+var videoExtensions = map[string]bool{
+	"3gp":  true,
+	"asf":  true,
+	"avi":  true,
+	"flv":  true,
+	"m2ts": true,
+	"m4v":  true,
+	"mkv":  true,
+	"mov":  true,
+	"mp4":  true,
+	"mpeg": true,
+	"mpg":  true,
+	"rm":   true,
+	"rmvb": true,
+	"ts":   true,
+	"webm": true,
+	"wmv":  true,
+}
+
+const folderVideoScanPageDelay = 750 * time.Millisecond
 
 // NewDrive115Service creates a new instance of Drive115Service
 func NewDrive115Service() *Drive115Service {
@@ -93,12 +116,175 @@ func (s *Drive115Service) ListFiles(ctx context.Context, credentials models.Driv
 	}
 
 	if limit == 0 {
-		limit = driver.FileListLimit
+		limit = 25
 	}
 
 	// Convert int64 to string as required by the API
 	dirIDStr := strconv.FormatInt(dirID, 10)
 	return client.ListPage(dirIDStr, offset, limit)
+}
+
+// CheckFolderVideos checks direct files in a folder for matching videos without returning directories.
+func (s *Drive115Service) CheckFolderVideos(ctx context.Context, credentials models.Drive115Credentials, dirID, limit int64, indexedName string) (*models.CheckFolderVideosResponse, error) {
+	client, err := s.createClient(credentials)
+	if err != nil {
+		return nil, err
+	}
+
+	if limit == 0 {
+		limit = 25
+	}
+
+	dirIDStr := strconv.FormatInt(dirID, 10)
+	expectedName := normalizeVideoMatchName(indexedName)
+	offset := int64(0)
+	result := &models.CheckFolderVideosResponse{IndexedName: expectedName}
+
+	for {
+		files, err := driver.GetFiles(
+			client.NewRequest().ForceContentType("application/json;charset=UTF-8"),
+			dirIDStr,
+			driver.WithLimit(limit),
+			driver.WithOffset(offset),
+			driver.WithShowDirEnable(false),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result.CheckedPages++
+		if result.CheckedPages == 1 {
+			for _, file := range files.Files {
+				result.Files = append(result.Files, fileSummary(file, expectedName))
+			}
+			if nextOffset := int64(files.Offset) + limit; nextOffset < int64(files.Count) {
+				result.NextOffset = &nextOffset
+			}
+		}
+
+		for _, file := range files.Files {
+			result.CheckedFiles++
+			if isMatchingVideoFile(file, expectedName) {
+				result.HasVideos = true
+				result.FirstVideoName = file.Name
+				return result, nil
+			}
+		}
+
+		offset = int64(files.Offset) + limit
+		if offset >= int64(files.Count) || len(files.Files) == 0 {
+			return result, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(folderVideoScanPageDelay):
+		}
+	}
+}
+
+func fileSummary(file driver.FileInfo, expectedName string) models.FileSummary {
+	return models.FileSummary{
+		ID:      file.FileID,
+		Name:    file.Name,
+		Type:    strings.ToLower(strings.TrimPrefix(file.Type, ".")),
+		Size:    int64(file.Size),
+		IsVideo: isVideoFile(file),
+		Matches: isMatchingVideoFile(file, expectedName),
+	}
+}
+
+func normalizeVideoMatchName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	name = trimLeadingDigitsBeforeCodeName(name)
+	if strings.HasSuffix(name, "ch") {
+		base := strings.TrimSuffix(name, "ch")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
+	if strings.HasSuffix(name, "-c") {
+		base := strings.TrimSuffix(name, "-c")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
+	if strings.HasSuffix(name, "-uncensored-hd") {
+		base := strings.TrimSuffix(name, "-uncensored-hd")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
+	return name
+}
+
+func trimLeadingDigitsBeforeCodeName(name string) string {
+	i := 0
+	for i < len(name) && name[i] >= '0' && name[i] <= '9' {
+		i++
+	}
+	if i == 0 || i == len(name) {
+		return name
+	}
+
+	rest := name[i:]
+	if looksLikeCodeName(rest) {
+		return rest
+	}
+	if strings.HasSuffix(rest, "ch") && looksLikeCodeName(strings.TrimSuffix(rest, "ch")) {
+		return rest
+	}
+	if strings.HasSuffix(rest, "-c") && looksLikeCodeName(strings.TrimSuffix(rest, "-c")) {
+		return rest
+	}
+	if strings.HasSuffix(rest, "-uncensored-hd") && looksLikeCodeName(strings.TrimSuffix(rest, "-uncensored-hd")) {
+		return rest
+	}
+	return name
+}
+
+func isMatchingVideoFile(file driver.FileInfo, expectedName string) bool {
+	if !isVideoFile(file) {
+		return false
+	}
+	if expectedName == "" {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(file.Name), expectedName)
+}
+
+func looksLikeCodeName(name string) bool {
+	parts := strings.Split(name, "-")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return false
+	}
+
+	for _, r := range parts[0] {
+		if r < 'a' || r > 'z' {
+			return false
+		}
+	}
+	for _, r := range parts[1] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isVideoFile(file driver.FileInfo) bool {
+	if videoExtensions[strings.ToLower(strings.TrimPrefix(file.Type, "."))] {
+		return true
+	}
+
+	parts := strings.Split(file.Name, ".")
+	if len(parts) < 2 {
+		return false
+	}
+
+	return videoExtensions[strings.ToLower(parts[len(parts)-1])]
 }
 
 // GetFileInfo returns information about a specific file

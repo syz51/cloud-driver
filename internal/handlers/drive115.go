@@ -132,28 +132,44 @@ func (h *Drive115Handler) ListFiles(c echo.Context) error {
 	if req.DirID == 0 {
 		dirIDStr := c.QueryParam("dir_id")
 		if dirIDStr != "" {
-			if id, err := strconv.ParseInt(dirIDStr, 10, 64); err == nil {
-				req.DirID = id
+			id, err := strconv.ParseInt(dirIDStr, 10, 64)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "dir_id must be numeric")
 			}
+			req.DirID = id
 		}
 	}
 
 	if req.Offset == 0 {
 		offsetStr := c.QueryParam("offset")
 		if offsetStr != "" {
-			if offset, err := strconv.ParseInt(offsetStr, 10, 64); err == nil {
-				req.Offset = offset
+			offset, err := strconv.ParseInt(offsetStr, 10, 64)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "offset must be numeric")
 			}
+			req.Offset = offset
 		}
 	}
 
 	if req.Limit == 0 {
 		limitStr := c.QueryParam("limit")
 		if limitStr != "" {
-			if limit, err := strconv.ParseInt(limitStr, 10, 64); err == nil {
-				req.Limit = limit
+			limit, err := strconv.ParseInt(limitStr, 10, 64)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "limit must be numeric")
 			}
+			req.Limit = limit
 		}
+	}
+
+	if req.Offset < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "offset must be greater than or equal to 0")
+	}
+	if req.DirID < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "dir_id must be greater than or equal to 0")
+	}
+	if req.Limit < 1 || req.Limit > 25 {
+		return echo.NewHTTPError(http.StatusBadRequest, "limit must be between 1 and 25")
 	}
 
 	files, err := h.service.ListFiles(c.Request().Context(), req.Credentials, req.DirID, req.Offset, req.Limit)
@@ -162,6 +178,54 @@ func (h *Drive115Handler) ListFiles(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, files)
+}
+
+// CheckFolderVideos checks direct files in a folder for videos.
+func (h *Drive115Handler) CheckFolderVideos(c echo.Context) error {
+	var req models.CheckFolderVideosRequest
+	if err := middleware.ValidateRequest(c, &req); err != nil {
+		return err
+	}
+
+	if req.DirID == 0 {
+		dirIDStr := c.QueryParam("dir_id")
+		if dirIDStr != "" {
+			id, err := strconv.ParseInt(dirIDStr, 10, 64)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "dir_id must be numeric")
+			}
+			req.DirID = id
+		}
+	}
+
+	if req.Limit == 0 {
+		limitStr := c.QueryParam("limit")
+		if limitStr != "" {
+			limit, err := strconv.ParseInt(limitStr, 10, 64)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "limit must be numeric")
+			}
+			req.Limit = limit
+		}
+	}
+
+	if req.IndexedName == "" {
+		req.IndexedName = c.QueryParam("indexed_name")
+	}
+
+	if req.DirID < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "dir_id must be greater than or equal to 0")
+	}
+	if req.Limit < 1 || req.Limit > 25 {
+		return echo.NewHTTPError(http.StatusBadRequest, "limit must be between 1 and 25")
+	}
+
+	result, err := h.service.CheckFolderVideos(c.Request().Context(), req.Credentials, req.DirID, req.Limit, req.IndexedName)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to check folder videos: "+err.Error())
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
 
 // GetFileInfo returns information about a specific file

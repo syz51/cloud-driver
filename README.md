@@ -188,6 +188,27 @@ Content-Type: application/json
 }
 ```
 
+### Check Folder Videos
+
+Checks direct files only; directories are excluded. `has_videos` is true only
+when a direct video filename contains `indexed_name`, case-insensitively. The
+response also includes the first page of direct files so folder review can
+render file contents without a second 115 request.
+
+```bash
+POST /api/v1/115/files/video-check?dir_id=0&limit=25&indexed_name=mukd-569
+Content-Type: application/json
+
+{
+  "credentials": {
+    "uid": "your_uid",
+    "cid": "your_cid",
+    "seid": "your_seid",
+    "kid": "your_kid"
+  }
+}
+```
+
 ### List Offline Tasks
 
 ```bash

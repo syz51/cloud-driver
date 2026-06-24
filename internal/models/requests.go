@@ -44,7 +44,36 @@ type ListFilesRequest struct {
 	Credentials Drive115Credentials `json:"credentials" validate:"required"`
 	DirID       int64               `json:"dir_id" validate:"omitempty,gte=0"`
 	Offset      int64               `json:"offset" validate:"omitempty,gte=0"`
-	Limit       int64               `json:"limit" validate:"omitempty,gte=1,lte=1150"`
+	Limit       int64               `json:"limit" validate:"omitempty,gte=1,lte=25"`
+}
+
+// CheckFolderVideosRequest represents a request to check direct files for videos.
+type CheckFolderVideosRequest struct {
+	Credentials Drive115Credentials `json:"credentials" validate:"required"`
+	DirID       int64               `json:"dir_id" validate:"omitempty,gte=0"`
+	Limit       int64               `json:"limit" validate:"omitempty,gte=1,lte=25"`
+	IndexedName string              `json:"indexed_name" validate:"omitempty,min=1,max=255"`
+}
+
+// CheckFolderVideosResponse summarizes a direct-file video check.
+type CheckFolderVideosResponse struct {
+	HasVideos      bool          `json:"has_videos"`
+	CheckedPages   int64         `json:"checked_pages"`
+	CheckedFiles   int64         `json:"checked_files"`
+	FirstVideoName string        `json:"first_video_name,omitempty"`
+	IndexedName    string        `json:"indexed_name,omitempty"`
+	Files          []FileSummary `json:"files"`
+	NextOffset     *int64        `json:"next_offset,omitempty"`
+}
+
+// FileSummary is a compact file row for folder review.
+type FileSummary struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Type    string `json:"type,omitempty"`
+	Size    int64  `json:"size"`
+	IsVideo bool   `json:"is_video"`
+	Matches bool   `json:"matches_indexed_name"`
 }
 
 // FileInfoRequest represents a request to get file info

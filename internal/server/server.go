@@ -65,6 +65,7 @@ func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Ha
 		drive115.POST("/tasks/delete", drive115Handler.DeleteOfflineTasks)
 		drive115.POST("/tasks/clear", drive115Handler.ClearOfflineTasks)
 		drive115.POST("/files", drive115Handler.ListFiles)
+		drive115.POST("/files/video-check", drive115Handler.CheckFolderVideos)
 		drive115.POST("/files/:id", drive115Handler.GetFileInfo)
 		drive115.POST("/files/:id/download", drive115Handler.DownloadFile)
 
