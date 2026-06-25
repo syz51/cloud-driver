@@ -73,6 +73,7 @@ func TestNormalizeVideoMatchName(t *testing.T) {
 		"ROYD-329-C":                            "royd-329",
 		"SOE-480-U":                             "soe-480",
 		"start-339-v":                           "start-339",
+		"SMBD-115-4K":                           "smbd-115",
 		"T38-053":                               "t38-053",
 		"FSDSS-894-uncensored-HD":               "fsdss-894",
 		"MNGS-045-中文字幕":                         "mngs-045",
