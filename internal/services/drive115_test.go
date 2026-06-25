@@ -38,6 +38,12 @@ func TestIsMatchingVideoFile(t *testing.T) {
 			expected:     true,
 		},
 		{
+			name:         "t38 special video",
+			expectedName: "t38-053",
+			file:         driver.FileInfo{Name: "T38-053.mp4", Type: "mp4"},
+			expected:     true,
+		},
+		{
 			name:         "wrong video",
 			expectedName: "mukd-569",
 			file:         driver.FileInfo{Name: "MUKD-570.mp4", Type: "mp4"},
@@ -65,6 +71,9 @@ func TestNormalizeVideoMatchName(t *testing.T) {
 	cases := map[string]string{
 		"MUKD-569ch":                            "mukd-569",
 		"ROYD-329-C":                            "royd-329",
+		"SOE-480-U":                             "soe-480",
+		"start-339-v":                           "start-339",
+		"T38-053":                               "t38-053",
 		"FSDSS-894-uncensored-HD":               "fsdss-894",
 		"MNGS-045-中文字幕":                         "mngs-045",
 		"358NTR-101":                            "ntr-101",

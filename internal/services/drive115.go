@@ -38,7 +38,7 @@ var videoExtensions = map[string]bool{
 const folderVideoScanPageDelay = 750 * time.Millisecond
 
 var trailingCodeNamePattern = regexp.MustCompile(`[a-z]+-\d+$`)
-var trailingCodeNameWithSuffixPattern = regexp.MustCompile(`(^|[^a-z0-9])([a-z]+-\d+)(ch|-c|-uncensored-hd|-中文字幕)$`)
+var trailingCodeNameWithSuffixPattern = regexp.MustCompile(`(^|[^a-z0-9])([a-z]+-\d+)(ch|-c|-u|-v|-uncensored-hd|-中文字幕)$`)
 var trailingFC2PPVNamePattern = regexp.MustCompile(`(^|[^a-z0-9])fc2[- ]?ppv[- ]?([0-9]+)(-(c|uc))?$`)
 
 // NewDrive115Service creates a new instance of Drive115Service
@@ -215,6 +215,18 @@ func normalizeVideoMatchName(name string) string {
 			return base
 		}
 	}
+	if strings.HasSuffix(name, "-u") {
+		base := strings.TrimSuffix(name, "-u")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
+	if strings.HasSuffix(name, "-v") {
+		base := strings.TrimSuffix(name, "-v")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
 	if strings.HasSuffix(name, "-uc") {
 		base := strings.TrimSuffix(name, "-uc")
 		if looksLikeFC2PPVName(base) {
@@ -262,6 +274,12 @@ func trimLeadingDigitsBeforeCodeName(name string) string {
 		return rest
 	}
 	if strings.HasSuffix(rest, "-c") && looksLikeCodeName(strings.TrimSuffix(rest, "-c")) {
+		return rest
+	}
+	if strings.HasSuffix(rest, "-u") && looksLikeCodeName(strings.TrimSuffix(rest, "-u")) {
+		return rest
+	}
+	if strings.HasSuffix(rest, "-v") && looksLikeCodeName(strings.TrimSuffix(rest, "-v")) {
 		return rest
 	}
 	if strings.HasSuffix(rest, "-uncensored-hd") && looksLikeCodeName(strings.TrimSuffix(rest, "-uncensored-hd")) {
