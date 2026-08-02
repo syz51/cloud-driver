@@ -192,6 +192,23 @@ func (c *Pan115Client) UploadSHA1(fileSize int64, fileName, dirID, preID, fileID
 
 // RapidUpload rapid upload
 func (c *Pan115Client) RapidUpload(fileSize int64, fileName, dirID, preID, fileID string, r io.ReadSeeker) (*UploadInitResp, error) {
+	signKey, signVal := "", ""
+	for {
+		result, err := c.RapidUploadByHash(fileSize, fileName, dirID, preID, fileID, signKey, signVal)
+		if err != nil || result.Status != 7 {
+			return result, err
+		}
+		signKey = result.SignKey
+		signVal, err = c.UploadDigestRange(r, result.SignCheck)
+		if err != nil {
+			return nil, err
+		}
+	}
+}
+
+// RapidUploadByHash performs one upload-init request using caller-provided hashes.
+// Status 7 means the caller must hash SignCheck and retry with SignKey and signVal.
+func (c *Pan115Client) RapidUploadByHash(fileSize int64, fileName, dirID, preID, fileID, signKey, signVal string) (*UploadInitResp, error) {
 	var (
 		ecdhCipher   *cipher.EcdhCipher
 		encrypted    []byte
@@ -210,6 +227,9 @@ func (c *Pan115Client) RapidUpload(fileSize int64, fileName, dirID, preID, fileI
 	if ok, err := c.UploadAvailable(); !ok || err != nil {
 		return nil, err
 	}
+	if fileSize > c.UploadMetaInfo.SizeLimit {
+		return nil, ErrUploadTooLarge
+	}
 
 	userID := strconv.FormatInt(c.UserID, 10)
 	form := url.Values{}
@@ -223,57 +243,45 @@ func (c *Pan115Client) RapidUpload(fileSize int64, fileName, dirID, preID, fileI
 	form.Set("sig", c.GenerateSignature(fileID, target))
 	form.Set("topupload", "true")
 
-	signKey, signVal := "", ""
-	for retry := true; retry; {
-		t := NowMilli()
+	t := NowMilli()
 
-		if encodedToken, err = ecdhCipher.EncodeToken(t.ToInt64()); err != nil {
-			return nil, err
-		}
-
-		params := map[string]string{
-			"k_ec": encodedToken,
-		}
-
-		form.Set("t", t.String())
-		form.Set("token", c.GenerateToken(fileID, preID, t.String(), fileSizeStr, signKey, signVal))
-		if signKey != "" && signVal != "" {
-			form.Set("sign_key", signKey)
-			form.Set("sign_val", signVal)
-		}
-		if encrypted, err = ecdhCipher.Encrypt([]byte(form.Encode())); err != nil {
-			return nil, err
-		}
-
-		req := c.NewRequest().
-			SetQueryParams(params).
-			SetBody(encrypted).
-			SetHeaderVerbatim("Content-Type", "application/x-www-form-urlencoded").
-			SetDoNotParseResponse(true)
-		resp, err := req.Post(ApiUploadInit)
-		if err != nil {
-			return nil, err
-		}
-		data := resp.RawBody()
-		defer data.Close()
-		if bodyBytes, err = io.ReadAll(data); err != nil {
-			return nil, err
-		}
-		if decrypted, err = ecdhCipher.Decrypt(bodyBytes); err != nil {
-			return nil, err
-		}
-		if err = CheckErr(json.Unmarshal(decrypted, &result), &result, resp); err != nil {
-			return nil, err
-		}
-		if result.Status == 7 {
-			// Update signKey & signVal
-			signKey = result.SignKey
-			signVal, _ = c.UploadDigestRange(r, result.SignCheck)
-		} else {
-			retry = false
-		}
-		result.SHA1 = fileID
+	if encodedToken, err = ecdhCipher.EncodeToken(t.ToInt64()); err != nil {
+		return nil, err
 	}
+
+	params := map[string]string{"k_ec": encodedToken}
+
+	form.Set("t", t.String())
+	form.Set("token", c.GenerateToken(fileID, preID, t.String(), fileSizeStr, signKey, signVal))
+	if signKey != "" && signVal != "" {
+		form.Set("sign_key", signKey)
+		form.Set("sign_val", signVal)
+	}
+	if encrypted, err = ecdhCipher.Encrypt([]byte(form.Encode())); err != nil {
+		return nil, err
+	}
+
+	req := c.NewRequest().
+		SetQueryParams(params).
+		SetBody(encrypted).
+		SetHeaderVerbatim("Content-Type", "application/x-www-form-urlencoded").
+		SetDoNotParseResponse(true)
+	resp, err := req.Post(ApiUploadInit)
+	if err != nil {
+		return nil, err
+	}
+	data := resp.RawBody()
+	defer data.Close()
+	if bodyBytes, err = io.ReadAll(data); err != nil {
+		return nil, err
+	}
+	if decrypted, err = ecdhCipher.Decrypt(bodyBytes); err != nil {
+		return nil, err
+	}
+	if err = CheckErr(json.Unmarshal(decrypted, &result), &result, resp); err != nil {
+		return nil, err
+	}
+	result.SHA1 = fileID
 
 	return &result, nil
 }

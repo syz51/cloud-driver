@@ -4,9 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"path"
 	"strconv"
-	"strings"
 
 	"cloud-driver/internal/middleware"
 	"cloud-driver/internal/models"
@@ -17,16 +15,26 @@ import (
 
 // Drive115Handler handles 115drive related requests
 type Drive115Handler struct {
-	service    *services.Drive115Service
-	uploadFile func(context.Context, models.Drive115Credentials, string, string, int64, io.ReadSeeker) error
+	service     *services.Drive115Service
+	uploads     uploadService
+	uploadCodec *uploadSessionCodec
+}
+
+type uploadService interface {
+	InitUpload(context.Context, models.UploadInitRequest, int64) (*services.UploadInitResult, error)
+	UploadStatus(context.Context, services.UploadSession) (*services.UploadProgress, error)
+	UploadPart(context.Context, services.UploadSession, int, io.Reader) error
+	CompleteUpload(context.Context, services.UploadSession) error
+	AbortUpload(context.Context, services.UploadSession) error
 }
 
 // NewDrive115Handler creates a new 115drive handler
-func NewDrive115Handler(service *services.Drive115Service) *Drive115Handler {
-	return &Drive115Handler{
-		service:    service,
-		uploadFile: service.UploadFile,
+func NewDrive115Handler(service *services.Drive115Service, uploadSessionSecret string) (*Drive115Handler, error) {
+	codec, err := newUploadSessionCodec(uploadSessionSecret)
+	if err != nil {
+		return nil, err
 	}
+	return &Drive115Handler{service: service, uploads: service, uploadCodec: codec}, nil
 }
 
 // GetUser returns the current user information
@@ -184,49 +192,6 @@ func (h *Drive115Handler) ListFiles(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, files)
-}
-
-// UploadFile uploads a local file to 115drive.
-func (h *Drive115Handler) UploadFile(c echo.Context) error {
-	var req models.UploadFileRequest
-	err := middleware.ValidateRequest(c, &req)
-	if form := c.Request().MultipartForm; form != nil {
-		defer form.RemoveAll()
-	}
-	if err != nil {
-		return err
-	}
-
-	if req.File.Size <= 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "file must not be empty")
-	}
-
-	fileName := path.Base(strings.ReplaceAll(req.File.Filename, "\\", "/"))
-	invalidControl := strings.IndexFunc(fileName, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0
-	if fileName == "." || fileName == ".." || fileName == "/" || len(fileName) > 255 || invalidControl {
-		return echo.NewHTTPError(http.StatusBadRequest, "file name must be valid and between 1 and 255 characters")
-	}
-
-	if req.DirID == "" {
-		req.DirID = "0"
-	}
-
-	source, err := req.File.Open()
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Failed to open uploaded file: "+err.Error())
-	}
-	defer source.Close()
-
-	if err := h.uploadFile(c.Request().Context(), req.Drive115Credentials, req.DirID, fileName, req.File.Size, source); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to upload file: "+err.Error())
-	}
-
-	return c.JSON(http.StatusCreated, map[string]interface{}{
-		"message": "File uploaded successfully",
-		"dir_id":  req.DirID,
-		"name":    fileName,
-		"size":    req.File.Size,
-	})
 }
 
 // CheckFolderVideos checks direct files in a folder for videos.

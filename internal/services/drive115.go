@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -128,20 +127,6 @@ func (s *Drive115Service) ListFiles(ctx context.Context, credentials models.Driv
 	// Convert int64 to string as required by the API
 	dirIDStr := strconv.FormatInt(dirID, 10)
 	return client.ListPage(dirIDStr, offset, limit)
-}
-
-// UploadFile uploads a local file to the specified directory.
-func (s *Drive115Service) UploadFile(ctx context.Context, credentials models.Drive115Credentials, dirID, fileName string, fileSize int64, file io.ReadSeeker) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	client, err := s.createClient(credentials)
-	if err != nil {
-		return err
-	}
-
-	return client.RapidUploadOrByOSS(dirID, fileName, fileSize, file)
 }
 
 // CheckFolderVideos checks direct files in a folder for matching videos without returning directories.

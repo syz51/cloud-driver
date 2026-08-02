@@ -17,7 +17,7 @@ import (
 )
 
 func TestServerSupportsH2C(t *testing.T) {
-	server, err := New(&config.Config{})
+	server, err := New(&config.Config{UploadSessionSecret: "test-upload-session-secret-at-least-32-characters"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,12 +75,12 @@ func TestUploadRouteIntegration(t *testing.T) {
 		writeLog.Close()
 	}()
 
-	server, err := New(&config.Config{UploadBodyLimit: "4B"})
+	server, err := New(&config.Config{UploadPartBodyLimit: "4B", UploadSessionSecret: "test-upload-session-secret-at-least-32-characters"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/115/files/upload", strings.NewReader("12345"))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/115/uploads/part", strings.NewReader("12345"))
 	rec := httptest.NewRecorder()
 	server.echo.ServeHTTP(rec, req)
 
@@ -106,6 +106,40 @@ func TestUploadRouteIntegration(t *testing.T) {
 	for _, key := range []string{"time", "id", "remote_ip", "host", "method", "uri", "user_agent", "status", "error", "latency", "latency_human", "bytes_in", "bytes_out"} {
 		if _, ok := logEntry[key]; !ok {
 			t.Fatalf("request log missing %q: %s", key, logData)
+		}
+	}
+}
+
+func TestUploadCORSIntegration(t *testing.T) {
+	if os.Getenv("CLOUD_DRIVER_INTEGRATION") != "1" {
+		t.Skip("set CLOUD_DRIVER_INTEGRATION=1 to run integration tests")
+	}
+	server, err := New(&config.Config{
+		UploadSessionSecret: "test-upload-session-secret-at-least-32-characters",
+		AllowedOrigins:      []string{"https://drive.example.com"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		origin string
+		allow  bool
+	}{
+		{origin: "https://drive.example.com", allow: true},
+		{origin: "https://evil.example.com", allow: false},
+	} {
+		req := httptest.NewRequest(http.MethodOptions, "/api/v1/115/uploads/part", nil)
+		req.Header.Set("Origin", test.origin)
+		req.Header.Set("Access-Control-Request-Method", http.MethodPut)
+		req.Header.Set("Access-Control-Request-Headers", "authorization,x-part-number,content-type")
+		rec := httptest.NewRecorder()
+		server.echo.ServeHTTP(rec, req)
+		got := rec.Header().Get("Access-Control-Allow-Origin")
+		if test.allow && got != test.origin {
+			t.Fatalf("origin %q: allow header = %q", test.origin, got)
+		}
+		if !test.allow && got != "" {
+			t.Fatalf("origin %q unexpectedly allowed", test.origin)
 		}
 	}
 }

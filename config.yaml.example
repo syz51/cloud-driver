@@ -5,5 +5,13 @@ server:
   host: "0.0.0.0"  # Server bind address (0.0.0.0 for all interfaces)
   port: 8080       # Server port
 
-# Maximum multipart upload request size (K, M, G, T, or P suffix).
-upload_body_limit: "20G"
+# Required. Encrypts resumable upload sessions; use a random value with 32+ characters.
+upload_session_secret: "replace-with-a-random-secret-at-least-32-characters"
+
+# Per-request guard. Files are split into 16 MiB requests, so total file size is unaffected.
+upload_part_body_limit: "17M"
+
+# Browser origins allowed to call this service.
+allowed_origins:
+  - "https://drive.example.com"
+  - "http://localhost:3012"

@@ -1,7 +1,5 @@
 package models
 
-import "mime/multipart"
-
 // Drive115Credentials represents 115driver credentials passed in requests
 type Drive115Credentials struct {
 	UID  string `json:"uid" form:"uid" validate:"required,drive115_id,min=1,max=100"`
@@ -10,11 +8,16 @@ type Drive115Credentials struct {
 	KID  string `json:"kid" form:"kid" validate:"required,drive115_id,min=1,max=100"`
 }
 
-// UploadFileRequest represents a multipart file upload.
-type UploadFileRequest struct {
-	Drive115Credentials
-	DirID string                `json:"dir_id" form:"dir_id" validate:"omitempty,numeric,max=30"`
-	File  *multipart.FileHeader `json:"file" form:"file" validate:"required"`
+// UploadInitRequest negotiates rapid upload or creates a resumable OSS upload.
+type UploadInitRequest struct {
+	Credentials Drive115Credentials `json:"credentials" validate:"required"`
+	DirID       string              `json:"dir_id" validate:"omitempty,numeric,max=30"`
+	FileName    string              `json:"file_name" validate:"required,min=1,max=255"`
+	FileSize    int64               `json:"file_size" validate:"required,gt=0,lte=167772160000"`
+	SHA1        string              `json:"sha1" validate:"required,len=40,hexadecimal"`
+	PreSHA1     string              `json:"pre_sha1" validate:"required,len=40,hexadecimal"`
+	SignKey     string              `json:"sign_key" validate:"omitempty,max=200"`
+	SignValue   string              `json:"sign_value" validate:"omitempty,len=40,hexadecimal"`
 }
 
 // OfflineDownloadRequest represents a request to add offline download tasks

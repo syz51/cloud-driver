@@ -30,7 +30,10 @@ func New(cfg *config.Config) (*Server, error) {
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler()
-	drive115Handler := handlers.NewDrive115Handler(drive115Service)
+	drive115Handler, err := handlers.NewDrive115Handler(drive115Service, cfg.UploadSessionSecret)
+	if err != nil {
+		return nil, fmt.Errorf("create 115 handler: %w", err)
+	}
 
 	// Setup Echo
 	e := echo.New()
@@ -97,16 +100,20 @@ func New(cfg *config.Config) (*Server, error) {
 		},
 	}))
 	e.Use(echomiddleware.Recover())
-	e.Use(echomiddleware.CORS())
+	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
+		AllowOrigins: cfg.AllowedOrigins,
+		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, echo.HeaderContentLength, "X-Part-Number"},
+	}))
 
 	e.Use(middleware.ValidationMiddleware())
 
 	// Setup routes
-	uploadBodyLimit := cfg.UploadBodyLimit
-	if uploadBodyLimit == "" {
-		uploadBodyLimit = "20G"
+	uploadPartBodyLimit := cfg.UploadPartBodyLimit
+	if uploadPartBodyLimit == "" {
+		uploadPartBodyLimit = "17M"
 	}
-	setupRoutes(e, healthHandler, drive115Handler, uploadBodyLimit)
+	setupRoutes(e, healthHandler, drive115Handler, uploadPartBodyLimit)
 
 	return &Server{
 		config: cfg,
@@ -115,7 +122,7 @@ func New(cfg *config.Config) (*Server, error) {
 }
 
 // setupRoutes configures all the application routes
-func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Handler *handlers.Drive115Handler, uploadBodyLimit string) {
+func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Handler *handlers.Drive115Handler, uploadPartBodyLimit string) {
 	// Health check
 	e.GET("/health", healthHandler.Check)
 
@@ -131,7 +138,11 @@ func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Ha
 		drive115.POST("/tasks/delete", drive115Handler.DeleteOfflineTasks)
 		drive115.POST("/tasks/clear", drive115Handler.ClearOfflineTasks)
 		drive115.POST("/files", drive115Handler.ListFiles)
-		drive115.POST("/files/upload", drive115Handler.UploadFile, echomiddleware.BodyLimit(uploadBodyLimit))
+		drive115.POST("/uploads/init", drive115Handler.InitUpload)
+		drive115.POST("/uploads/status", drive115Handler.UploadStatus)
+		drive115.PUT("/uploads/part", drive115Handler.UploadPart, echomiddleware.BodyLimit(uploadPartBodyLimit))
+		drive115.POST("/uploads/complete", drive115Handler.CompleteUpload)
+		drive115.POST("/uploads/abort", drive115Handler.AbortUpload)
 		drive115.POST("/files/video-check", drive115Handler.CheckFolderVideos)
 		drive115.POST("/files/:id", drive115Handler.GetFileInfo)
 		drive115.POST("/files/:id/download", drive115Handler.DownloadFile)

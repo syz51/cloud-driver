@@ -110,7 +110,11 @@ air
 server:
   host: "0.0.0.0" # Server bind address
   port: 8080 # Server port
-upload_body_limit: "20G" # Maximum local upload request size
+upload_session_secret: "replace-with-a-random-secret-at-least-32-characters"
+upload_part_body_limit: "17M" # 16 MiB parts plus request guard
+allowed_origins:
+  - "https://drive.example.com"
+  - "http://localhost:3012"
 ```
 
 ### Environment Variables
@@ -120,7 +124,9 @@ Override configuration using environment variables with the `CLOUD_DRIVER_` pref
 ```bash
 export CLOUD_DRIVER_SERVER_PORT=8080
 export CLOUD_DRIVER_SERVER_HOST=0.0.0.0
-export CLOUD_DRIVER_UPLOAD_BODY_LIMIT=20G
+export CLOUD_DRIVER_UPLOAD_SESSION_SECRET='replace-with-a-random-secret-at-least-32-characters'
+export CLOUD_DRIVER_UPLOAD_PART_BODY_LIMIT=17M
+export CLOUD_DRIVER_ALLOWED_ORIGINS='https://drive.example.com,http://localhost:3012'
 ```
 
 ### Getting 115Cloud Credentials
@@ -213,23 +219,37 @@ Content-Type: application/json
 
 ### Upload a Local File
 
-Uploads one local file using `multipart/form-data`. `dir_id` defaults to the
-root directory (`0`). Requests default to a `20G` body limit, configurable via
-`upload_body_limit`.
+Large files use resumable 16 MiB requests. Browser computes SHA1 first so 115
+can attempt rapid upload before any file bytes move. Normal uploads stream each
+part directly from request body into 115 OSS; Cloud Run never stages full file
+in heap or writable filesystem.
 
-Cloud Run deployments must enable HTTP/2 end-to-end on the container port for
-uploads larger than 32 MiB. The server accepts cleartext HTTP/2 (`h2c`) for
-that deployment mode while remaining compatible with HTTP/1 clients.
+1. `POST /api/v1/115/uploads/init` with credentials, destination, name, size,
+   full-file SHA1, and first-128-KiB SHA1.
+2. If response is `sign_check`, hash requested inclusive byte range and repeat
+   init with `sign_key` and `sign_value`.
+3. If response is `upload`, keep returned encrypted bearer token. Use
+   `POST /api/v1/115/uploads/status` to resume, then send raw parts to
+   `PUT /api/v1/115/uploads/part`
+   with `Authorization: Bearer ...` and `X-Part-Number`.
+4. Call `POST /api/v1/115/uploads/complete`. Call
+   `POST /api/v1/115/uploads/abort` when discarding.
+
+Init request:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/115/files/upload \
-  -F 'uid=YOUR_UID' \
-  -F 'cid=YOUR_CID' \
-  -F 'seid=YOUR_SEID' \
-  -F 'kid=YOUR_KID' \
-  -F 'dir_id=0' \
-  -F 'file=@/absolute/path/to/video.mp4'
+curl -X POST http://localhost:8080/api/v1/115/uploads/init \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "credentials":{"uid":"...","cid":"...","seid":"...","kid":"..."},
+    "dir_id":"0","file_name":"video.mp4","file_size":729897389,
+    "sha1":"FULL_FILE_SHA1","pre_sha1":"FIRST_128_KIB_SHA1"
+  }'
 ```
+
+Sessions expire after 24 hours and remain decryptable for seven more days only
+so abandoned multipart uploads can be aborted. OSS credentials stay server-side
+and refresh independently for every part.
 
 ### List Offline Tasks
 
