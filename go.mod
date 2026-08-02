@@ -2,6 +2,8 @@ module cloud-driver
 
 go 1.26.5
 
+replace github.com/SheltonZhu/115driver => ./third_party/115driver
+
 require (
 	github.com/SheltonZhu/115driver v1.3.5
 	github.com/go-playground/validator/v10 v10.30.3
