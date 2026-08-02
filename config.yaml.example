@@ -3,5 +3,7 @@
 
 server:
   host: "0.0.0.0"  # Server bind address (0.0.0.0 for all interfaces)
-  port: 8081       # Server port
+  port: 8080       # Server port
 
+# Maximum multipart upload request size (K, M, G, T, or P suffix).
+upload_body_limit: "20G"

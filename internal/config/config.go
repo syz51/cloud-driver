@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/labstack/gommon/bytes"
 	"github.com/spf13/viper"
 )
 
 // Config represents the application configuration
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
+	Server          ServerConfig `mapstructure:"server"`
+	UploadBodyLimit string       `mapstructure:"upload_body_limit"`
 }
 
 // ServerConfig contains server-related configuration
@@ -28,6 +30,7 @@ func Load() (*Config, error) {
 	// Set default values
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("server.host", "localhost")
+	viper.SetDefault("upload_body_limit", "20G")
 
 	// Environment variable support
 	viper.SetEnvPrefix("CLOUD_DRIVER")
@@ -54,6 +57,9 @@ func validate(cfg *Config) error {
 	// Server validation
 	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", cfg.Server.Port)
+	}
+	if _, err := bytes.Parse(cfg.UploadBodyLimit); err != nil {
+		return fmt.Errorf("invalid upload body limit: %q", cfg.UploadBodyLimit)
 	}
 
 	return nil

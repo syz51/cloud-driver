@@ -4,7 +4,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/cloud-driver)](https://goreportcard.com/report/github.com/yourusername/cloud-driver)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-1.24.4+-blue.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.26.5+-blue.svg)](https://go.dev/)
 
 ## Features
 
@@ -22,7 +22,7 @@
 - ✅ File and directory listing with navigation
 - ✅ Offline download task management (add, list, delete, clear)
 - ✅ File operations (info, download links)
-- 🔄 Upload operations (planned)
+- ✅ Local file uploads with rapid/OSS transfer
 - 🔄 Advanced file management (move, copy, delete) (planned)
 
 ## Architecture
@@ -61,7 +61,7 @@ cloud-driver/
 
 ### Prerequisites
 
-- **Go 1.24.4+**
+- **Go 1.26.5+**
 - **Docker** (optional, for easy deployment)
 
 ### Option 1: Docker (Recommended)
@@ -110,6 +110,7 @@ air
 server:
   host: "0.0.0.0" # Server bind address
   port: 8080 # Server port
+upload_body_limit: "20G" # Maximum local upload request size
 ```
 
 ### Environment Variables
@@ -119,6 +120,7 @@ Override configuration using environment variables with the `CLOUD_DRIVER_` pref
 ```bash
 export CLOUD_DRIVER_SERVER_PORT=8080
 export CLOUD_DRIVER_SERVER_HOST=0.0.0.0
+export CLOUD_DRIVER_UPLOAD_BODY_LIMIT=20G
 ```
 
 ### Getting 115Cloud Credentials
@@ -207,6 +209,22 @@ Content-Type: application/json
     "kid": "your_kid"
   }
 }
+```
+
+### Upload a Local File
+
+Uploads one local file using `multipart/form-data`. `dir_id` defaults to the
+root directory (`0`). Requests default to a `20G` body limit, configurable via
+`upload_body_limit`.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/115/files/upload \
+  -F 'uid=YOUR_UID' \
+  -F 'cid=YOUR_CID' \
+  -F 'seid=YOUR_SEID' \
+  -F 'kid=YOUR_KID' \
+  -F 'dir_id=0' \
+  -F 'file=@/absolute/path/to/video.mp4'
 ```
 
 ### List Offline Tasks

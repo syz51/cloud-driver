@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ var videoExtensions = map[string]bool{
 const folderVideoScanPageDelay = 750 * time.Millisecond
 
 var trailingCodeNamePattern = regexp.MustCompile(`[a-z]+-\d+$`)
-var trailingCodeNameWithSuffixPattern = regexp.MustCompile(`(^|[^a-z0-9])([a-z]+-\d+)(ch|-c|-u|-v|-4k|-uncensored-hd|-中文字幕)$`)
+var trailingCodeNameWithSuffixPattern = regexp.MustCompile(`(^|[^a-z0-9])([a-z]+-\d+)(ch|-c|-u|-v|-4k|_4k|-uncensored-hd|-中文字幕)$`)
 var trailingFC2PPVNamePattern = regexp.MustCompile(`(^|[^a-z0-9])fc2[- ]?ppv[- ]?([0-9]+)(-(c|uc))?$`)
 
 // NewDrive115Service creates a new instance of Drive115Service
@@ -127,6 +128,20 @@ func (s *Drive115Service) ListFiles(ctx context.Context, credentials models.Driv
 	// Convert int64 to string as required by the API
 	dirIDStr := strconv.FormatInt(dirID, 10)
 	return client.ListPage(dirIDStr, offset, limit)
+}
+
+// UploadFile uploads a local file to the specified directory.
+func (s *Drive115Service) UploadFile(ctx context.Context, credentials models.Drive115Credentials, dirID, fileName string, fileSize int64, file io.ReadSeeker) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	client, err := s.createClient(credentials)
+	if err != nil {
+		return err
+	}
+
+	return client.RapidUploadOrByOSS(dirID, fileName, fileSize, file)
 }
 
 // CheckFolderVideos checks direct files in a folder for matching videos without returning directories.
@@ -233,6 +248,12 @@ func normalizeVideoMatchName(name string) string {
 			return base
 		}
 	}
+	if strings.HasSuffix(name, "_4k") {
+		base := strings.TrimSuffix(name, "_4k")
+		if looksLikeCodeName(base) {
+			return base
+		}
+	}
 	if strings.HasSuffix(name, "-uc") {
 		base := strings.TrimSuffix(name, "-uc")
 		if looksLikeFC2PPVName(base) {
@@ -289,6 +310,9 @@ func trimLeadingDigitsBeforeCodeName(name string) string {
 		return rest
 	}
 	if strings.HasSuffix(rest, "-4k") && looksLikeCodeName(strings.TrimSuffix(rest, "-4k")) {
+		return rest
+	}
+	if strings.HasSuffix(rest, "_4k") && looksLikeCodeName(strings.TrimSuffix(rest, "_4k")) {
 		return rest
 	}
 	if strings.HasSuffix(rest, "-uncensored-hd") && looksLikeCodeName(strings.TrimSuffix(rest, "-uncensored-hd")) {

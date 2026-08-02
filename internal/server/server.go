@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
 	"cloud-driver/internal/config"
 	"cloud-driver/internal/handlers"
@@ -33,14 +36,76 @@ func New(cfg *config.Config) (*Server, error) {
 	e.HideBanner = true
 
 	// Middleware
-	e.Use(echomiddleware.Logger())
+	e.Use(echomiddleware.RequestLoggerWithConfig(echomiddleware.RequestLoggerConfig{
+		LogLatency:      true,
+		LogRemoteIP:     true,
+		LogHost:         true,
+		LogMethod:       true,
+		LogURI:          true,
+		LogRequestID:    true,
+		LogUserAgent:    true,
+		LogStatus:       true,
+		LogError:        true,
+		LogResponseSize: true,
+		HandleError:     true,
+		LogValuesFunc: func(c echo.Context, values echomiddleware.RequestLoggerValues) error {
+			errorMessage := ""
+			if values.Error != nil {
+				errorMessage = values.Error.Error()
+			}
+			bytesIn := c.Request().ContentLength
+			if bytesIn < 0 {
+				bytesIn = 0
+			}
+
+			entry, err := json.Marshal(struct {
+				Time         string `json:"time"`
+				ID           string `json:"id"`
+				RemoteIP     string `json:"remote_ip"`
+				Host         string `json:"host"`
+				Method       string `json:"method"`
+				URI          string `json:"uri"`
+				UserAgent    string `json:"user_agent"`
+				Status       int    `json:"status"`
+				Error        string `json:"error"`
+				Latency      int64  `json:"latency"`
+				LatencyHuman string `json:"latency_human"`
+				BytesIn      int64  `json:"bytes_in"`
+				BytesOut     int64  `json:"bytes_out"`
+			}{
+				Time:         time.Now().Format(time.RFC3339Nano),
+				ID:           values.RequestID,
+				RemoteIP:     values.RemoteIP,
+				Host:         values.Host,
+				Method:       values.Method,
+				URI:          values.URI,
+				UserAgent:    values.UserAgent,
+				Status:       values.Status,
+				Error:        errorMessage,
+				Latency:      int64(values.Latency),
+				LatencyHuman: values.Latency.String(),
+				BytesIn:      bytesIn,
+				BytesOut:     values.ResponseSize,
+			})
+			if err != nil {
+				return err
+			}
+			entry = append(entry, '\n')
+			_, err = os.Stdout.Write(entry)
+			return err
+		},
+	}))
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.CORS())
 
 	e.Use(middleware.ValidationMiddleware())
 
 	// Setup routes
-	setupRoutes(e, healthHandler, drive115Handler)
+	uploadBodyLimit := cfg.UploadBodyLimit
+	if uploadBodyLimit == "" {
+		uploadBodyLimit = "20G"
+	}
+	setupRoutes(e, healthHandler, drive115Handler, uploadBodyLimit)
 
 	return &Server{
 		config: cfg,
@@ -49,7 +114,7 @@ func New(cfg *config.Config) (*Server, error) {
 }
 
 // setupRoutes configures all the application routes
-func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Handler *handlers.Drive115Handler) {
+func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Handler *handlers.Drive115Handler, uploadBodyLimit string) {
 	// Health check
 	e.GET("/health", healthHandler.Check)
 
@@ -65,6 +130,7 @@ func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Ha
 		drive115.POST("/tasks/delete", drive115Handler.DeleteOfflineTasks)
 		drive115.POST("/tasks/clear", drive115Handler.ClearOfflineTasks)
 		drive115.POST("/files", drive115Handler.ListFiles)
+		drive115.POST("/files/upload", drive115Handler.UploadFile, echomiddleware.BodyLimit(uploadBodyLimit))
 		drive115.POST("/files/video-check", drive115Handler.CheckFolderVideos)
 		drive115.POST("/files/:id", drive115Handler.GetFileInfo)
 		drive115.POST("/files/:id/download", drive115Handler.DownloadFile)
