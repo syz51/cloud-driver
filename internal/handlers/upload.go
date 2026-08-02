@@ -15,7 +15,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const uploadSessionLifetime = 24 * time.Hour
+const uploadSessionLifetime = 30 * 24 * time.Hour
 
 func (h *Drive115Handler) InitUpload(c echo.Context) error {
 	var req models.UploadInitRequest

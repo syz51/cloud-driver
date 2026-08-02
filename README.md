@@ -247,7 +247,7 @@ curl -X POST http://localhost:8080/api/v1/115/uploads/init \
   }'
 ```
 
-Sessions expire after 24 hours and remain decryptable for seven more days only
+Sessions expire after 30 days and remain decryptable for seven more days only
 so abandoned multipart uploads can be aborted. OSS credentials stay server-side
 and refresh independently for every part.
 
