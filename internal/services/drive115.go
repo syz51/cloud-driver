@@ -58,7 +58,7 @@ func (s *Drive115Service) createClient(credentials models.Drive115Credentials) (
 	}
 
 	// Create client and verify login
-	client := driver.Defalut().ImportCredential(cr)
+	client := driver.New(driver.UA(driver.UA115Disk)).ImportCredential(cr)
 	if err := client.LoginCheck(); err != nil {
 		return nil, fmt.Errorf("115 driver login failed: %w", err)
 	}
