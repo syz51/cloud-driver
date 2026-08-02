@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"cloud-driver/internal/config"
-	"golang.org/x/net/http2"
 )
 
 func TestServerSupportsH2C(t *testing.T) {
@@ -33,17 +31,13 @@ func TestServerSupportsH2C(t *testing.T) {
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Start() }()
 
-	client := &http.Client{Transport: &http2.Transport{
-		AllowHTTP: true,
-		DialTLSContext: func(ctx context.Context, network, address string, _ *tls.Config) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, address)
-		},
-	}}
+	protocols := new(http.Protocols)
+	protocols.SetUnencryptedHTTP2(true)
+	client := &http.Client{Transport: &http.Transport{Protocols: protocols}}
 	response, err := client.Get("http://" + listener.Addr().String() + "/health")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
 
 	if response.ProtoMajor != 2 {
 		t.Fatalf("protocol = %s, want HTTP/2", response.Proto)
@@ -51,6 +45,8 @@ func TestServerSupportsH2C(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", response.StatusCode)
 	}
+	response.Body.Close()
+	client.CloseIdleConnections()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
