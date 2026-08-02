@@ -1,16 +1,66 @@
 package server
 
 import (
+	"context"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud-driver/internal/config"
+	"golang.org/x/net/http2"
 )
+
+func TestServerSupportsH2C(t *testing.T) {
+	server, err := New(&config.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.echo.Listener = listener
+
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- server.Start() }()
+
+	client := &http.Client{Transport: &http2.Transport{
+		AllowHTTP: true,
+		DialTLSContext: func(ctx context.Context, network, address string, _ *tls.Config) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, address)
+		},
+	}}
+	response, err := client.Get("http://" + listener.Addr().String() + "/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+
+	if response.ProtoMajor != 2 {
+		t.Fatalf("protocol = %s, want HTTP/2", response.Proto)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", response.StatusCode)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		t.Fatal(err)
+	}
+}
 
 func TestUploadRouteIntegration(t *testing.T) {
 	if os.Getenv("CLOUD_DRIVER_INTEGRATION") != "1" {

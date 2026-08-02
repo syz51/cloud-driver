@@ -217,6 +217,10 @@ Uploads one local file using `multipart/form-data`. `dir_id` defaults to the
 root directory (`0`). Requests default to a `20G` body limit, configurable via
 `upload_body_limit`.
 
+Cloud Run deployments must enable HTTP/2 end-to-end on the container port for
+uploads larger than 32 MiB. The server accepts cleartext HTTP/2 (`h2c`) for
+that deployment mode while remaining compatible with HTTP/1 clients.
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/115/files/upload \
   -F 'uid=YOUR_UID' \

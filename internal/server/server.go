@@ -14,6 +14,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
+	"golang.org/x/net/http2"
 )
 
 // Server represents the HTTP server
@@ -146,7 +147,7 @@ func setupRoutes(e *echo.Echo, healthHandler *handlers.HealthHandler, drive115Ha
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	address := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
-	return s.echo.Start(address)
+	return s.echo.StartH2CServer(address, &http2.Server{})
 }
 
 // Shutdown gracefully shuts down the server
