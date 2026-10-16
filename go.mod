@@ -1,6 +1,6 @@
 module cloud-driver
 
-go 1.26.5
+go 1.27.2
 
 replace github.com/SheltonZhu/115driver => ./third_party/115driver
 

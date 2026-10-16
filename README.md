@@ -4,7 +4,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/cloud-driver)](https://goreportcard.com/report/github.com/yourusername/cloud-driver)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-1.26.5+-blue.svg)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.27.2+-blue.svg)](https://go.dev/)
 
 ## Features
 
@@ -61,7 +61,7 @@ cloud-driver/
 
 ### Prerequisites
 
-- **Go 1.26.5+**
+- **Go 1.27.2+**
 - **Docker** (optional, for easy deployment)
 
 ### Option 1: Docker (Recommended)
