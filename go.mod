@@ -6,6 +6,7 @@ replace github.com/SheltonZhu/115driver => ./third_party/115driver
 
 require (
 	github.com/SheltonZhu/115driver v1.3.5
+	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/labstack/echo/v4 v4.15.4
 	github.com/labstack/gommon v0.5.0
@@ -14,7 +15,6 @@ require (
 
 require (
 	github.com/aead/ecdh v0.2.0 // indirect
-	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible // indirect
 	github.com/andreburgaud/crypt2go v1.8.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
